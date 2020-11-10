@@ -1,0 +1,170 @@
+<html>
+<head>
+    <title>Smart Heater</title>
+    <script src="/jquery-3.4.1.min.js"></script>
+    <script type="text/javascript">
+        // set value of node to text
+        function setTxt(id, txt) {
+            $( "#" + id ).html(txt);
+        }
+
+        /**
+         * 
+         */
+        function minsToReadable(mins) {
+            var hours = Math.floor(mins * 1.0 / 60)
+            mins = mins - hours * 60
+            return hours + 'h ' + mins + 'm'
+        }
+
+        // refresh data
+        function refreshData() {
+            $.ajax({
+                url: "/api/getStatus",
+                success: function(result) {
+                    console.log(result)
+                    var env = result.environment;
+                    var target = result.activeHeatingTarget
+                    var schedule = result.schedule
+
+                    setTxt('heaterEnabled', result.heaterEnabled ? 'Enabled' : 'Disabled');
+                    
+                    setTxt('curTemperature', env.temperature);
+                    setTxt('curHumidity', env.humidity);
+                    setTxt('ambientTemperature', env.outsideTemperature);
+
+                    setTxt('targetTemperature', target.target.targetTemperature);
+                    setTxt('targetTime', new Date(target.target.startTime));
+                    setTxt('predictedTime', minsToReadable(target.predictedMins));
+                }
+            });
+
+            $.ajax({
+                url: "/api/getSchedule",
+                success: function(result) {
+                    console.log(result)
+                    $('#scheduleOutput').val(JSON.stringify(result, null, 2));
+
+                    if (result.manualOverride !== null) {
+                        const override = result.manualOverride
+                        const timeLeft = override.endTime - Date.now()
+                        const timeLeftStr = minsToReadable(Math.floor(timeLeft * 1.0 / 1000 / 60))
+                        if (timeLeft > 0) {
+                            $('#manualOverrideForm').hide();
+                            setTxt('manualOverrideTemperature', override.targetTemperature);
+                            setTxt('manualOverrideTime', timeLeftStr);
+                            $('#manualOverrideInfo').show()                            
+                        } else {
+                            printManualOverrideForm()
+                        }
+                    } else {
+                        printManualOverrideForm()
+                        
+                    }
+                }
+            });
+        }
+
+        /**
+         * 
+         */
+        function printManualOverrideForm() {
+            $('#manualOverrideInfo').hide()
+            $('#manualOverrideForm').show()
+        }
+
+        /**
+         * 
+         */
+        function refreshPeriodic() {
+            refreshData();
+            window.setTimeout(refreshPeriodic, 60*1000)
+        }
+
+        // perform request
+        $( document ).ready(function() {
+            refreshPeriodic();
+        });
+
+
+        // set manual override
+        function setManualOverride() {
+            const data = {
+                startTime: Date.now(),
+                endTime: Date.now() + ($('#overrideHours').val() * 60 * 60 * 1000) + ($('#overrideMinutes').val() * 60 * 1000),
+                targetTemperature: parseInt($('#overrideTemperature').val())
+            }
+            $.ajax({
+                type: "POST",
+                contentType: 'application/json',
+                url: "api/setOverride",
+                data: JSON.stringify(data),
+                success: function( data ) {
+                    console.log(data);
+                    refreshData();
+                }
+            });
+        }
+
+        function removeManualOverride() {
+            $.ajax({
+                type: "POST",
+                contentType: 'application/json',
+                url: "api/setOverride",
+                data: JSON.stringify({remove: true}),
+                success: function( data ) {
+                    console.log(data);
+                    refreshData();
+                }
+            });
+        }
+        
+
+    </script>
+</head>
+<body>
+    <h1>Heater Status</h1>
+    <p>
+        <b><span id="heaterEnabled"></span></b><br/>
+    </p>
+    <p>
+        <h2>Environment</h2>
+        Temperature: <span id="curTemperature"></span><br/>
+        Humidtity: <span id="curHumidity"></span><br/>
+        Ambient Temperature: <span id="ambientTemperature"></span><br/>
+    </p>
+    <p>
+        <h2>Override Temperature</h2>
+
+        <form id="manualOverrideForm" style="display: none;">
+            <label for="overrideTemperature">Temperature: </label> 
+            <input type="number" id="overrideTemperature" name="overrideTemperature" value="21">
+            <br/>
+            <div style="padding-top: 8px; margin-bottom: 5px;">Expiry:</div>
+            <label for="overrideHours">Hours: </label> 
+            <input type="number" id="overrideHours" name="overrideHours" value="2" min="0">
+            <br/>
+            <label for="overrideMinutes">Minutes: </label> 
+            <input type="number" id="overrideMinutes" name="overrideMinutes" value="0" min="0">
+            <br/>
+            <input type="button" value="Save" onclick="javascript: setManualOverride()">
+        </form>
+
+        <span id="manualOverrideInfo" style="display: none;">
+            Temperature: <span id="manualOverrideTemperature"></span><br/>
+            Time left: <span id="manualOverrideTime"></span><br/>
+            <input type="button" value="Remove" onclick="javascript: removeManualOverride()">
+        </span>
+    </p>
+    <p>
+        <h2>Target</h2>
+        Target Temperature: <span id="targetTemperature"></span><br/>
+        Target Time: <span id="targetTime"></span><br/>
+        Predicted Time: <span id="predictedTime"></span>
+    </p>
+    <p>
+        <h2>Schedule JSON</h2>
+        <textarea rows="20" cols="100" id="scheduleOutput"></textarea>
+    </p>
+</body>
+</html>

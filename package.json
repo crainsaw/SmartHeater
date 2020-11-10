@@ -1,0 +1,26 @@
+{
+  "name": "smart_heater",
+  "version": "1.0.0",
+  "description": "Smart heating system that controls infrared heaters",
+  "main": "dist/main",
+  "types": "dist/main",
+  "dependencies": {
+    "express": "^4.17.1",
+    "mqtt": "^4.2.1"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.6",
+    "@types/node": "^8.10.64",
+    "body-parser": "^1.19.0",
+    "typescript": "^3.8.3"
+  },
+  "scripts": {
+    "compile-src": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node dist/main.js",
+    "docker-build": "docker build . --tag crine/smart-heat-controller",
+    "docker-run": "docker run --volume=/heatController:/heater/server/storage -p 80:3000 --device /dev/gpiomem -d crine/smart-heat-controller"
+  },
+  "author": "Christian N.",
+  "license": "ISC"
+}
